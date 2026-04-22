@@ -4,7 +4,9 @@ const Allocator = std.mem.Allocator;
 
 /// A self-balancing AVL binary search tree, generic over key type K and value type V.
 /// K must support `<` and `>` operators (integer and float types).
-pub fn AvlTree(comptime K: type, comptime V: type) type {
+pub fn AvlTree(comptime K: type, comptime V: type) type { // comptime means this evaluate at compile time not runtime.
+                                                          // Zig runs an interpreter during compilation
+                                                          // Types don't exist at runtime.
     return struct {
         const Self = @This();
 
