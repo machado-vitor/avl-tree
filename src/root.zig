@@ -11,7 +11,7 @@ pub fn AvlTree(comptime K: type, comptime V: type) type {
             value: V,
             left: ?*Node = null,
             right: ?*Node = null,
-            height: i32 = 1,
+            height: i32 = 1, // leaves start at 1; null children count as 0
         };
 
         root: ?*Node = null,
@@ -38,6 +38,7 @@ pub fn AvlTree(comptime K: type, comptime V: type) type {
         }
 
         fn balanceFactor(node: *Node) i32 {
+            // > 0 means left-heavy, < 0 means right-heavy. AVL invariant: |bf| <= 1
             return nodeHeight(node.left) - nodeHeight(node.right);
         }
 
@@ -45,15 +46,17 @@ pub fn AvlTree(comptime K: type, comptime V: type) type {
             node.height = 1 + @max(nodeHeight(node.left), nodeHeight(node.right));
         }
 
+        // fixes left-heavy: x bubbles up, y becomes x's right child
         fn rotateRight(y: *Node) *Node {
             const x = y.left.?;
             y.left = x.right;
             x.right = y;
-            updateHeight(y);
+            updateHeight(y); // update y first — it's now lower in the tree
             updateHeight(x);
             return x;
         }
 
+        // mirror of rotateRight: fixes right-heavy
         fn rotateLeft(x: *Node) *Node {
             const y = x.right.?;
             x.right = y.left;
@@ -67,10 +70,12 @@ pub fn AvlTree(comptime K: type, comptime V: type) type {
             updateHeight(node);
             const bf = balanceFactor(node);
             if (bf > 1) {
+                // left-heavy. if left child leans right, it's the left-right case — pre-rotate left
                 if (balanceFactor(node.left.?) < 0) node.left = rotateLeft(node.left.?);
                 return rotateRight(node);
             }
             if (bf < -1) {
+                // mirror: right-left case needs a right rotation on the right child first
                 if (balanceFactor(node.right.?) > 0) node.right = rotateRight(node.right.?);
                 return rotateLeft(node);
             }
@@ -92,8 +97,9 @@ pub fn AvlTree(comptime K: type, comptime V: type) type {
             } else if (key > n.key) {
                 n.right = try insertAt(allocator, n.right, key, value);
             } else {
-                n.value = value;
+                n.value = value; // duplicate key — overwrite
             }
+            // rebalance on the way back up; one rotation per level is enough
             return rebalance(n);
         }
 
@@ -116,17 +122,19 @@ pub fn AvlTree(comptime K: type, comptime V: type) type {
         }
 
         fn deleteAt(allocator: Allocator, node: ?*Node, key: K) ?*Node {
-            const n = node orelse return null;
+            const n = node orelse return null; // key not in tree — no-op
             if (key < n.key) {
                 n.left = deleteAt(allocator, n.left, key);
             } else if (key > n.key) {
                 n.right = deleteAt(allocator, n.right, key);
             } else {
+                // 0 or 1 child: splice the child in place of n
                 if (n.left == null or n.right == null) {
                     const child = n.left orelse n.right;
                     allocator.destroy(n);
                     return child;
                 }
+                // 2 children: copy inorder successor into n, then delete it from the right subtree
                 const successor = minNode(n.right.?);
                 n.key = successor.key;
                 n.value = successor.value;
